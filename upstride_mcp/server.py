@@ -314,3 +314,38 @@ async def update_talk(
 async def delete_talk(talk_id: str) -> dict:
     """Permanently remove a talk. Confirm with the user first."""
     return await request("DELETE", f"/api/admin/talks/{talk_id}")
+
+
+# ═══════════════════════════════════════════════════════ about profile ══
+
+class Stat(BaseModel):
+    n: str = Field(max_length=20, description='The number, e.g. "1000+"')
+    l: str = Field(max_length=60, description='The label, e.g. "Students mentored"')
+
+
+@mcp.tool(annotations=READ)
+async def get_profile() -> dict:
+    """The mamlesh.me home/about profile: name, role, company, tagline, intro paragraphs, stat row."""
+    return await request("GET", "/api/admin/profile")
+
+
+@mcp.tool(annotations=WRITE)
+async def update_profile(
+    name: Optional[str] = None,
+    role: Optional[str] = None,
+    company: Optional[str] = None,
+    email: Optional[str] = None,
+    linkedin: Optional[str] = None,
+    linkedin_followers: Annotated[Optional[str], Field(description='e.g. "16k+"')] = None,
+    tagline: Optional[str] = None,
+    intro: Annotated[Optional[list[str]], Field(description="Replaces all intro paragraphs")] = None,
+    stats: Annotated[Optional[list[Stat]], Field(description="Replaces the whole stat row")] = None,
+) -> dict:
+    """Edit the home/about profile. Only the fields you pass change; intro and stats
+    replace the whole list, so read get_profile first when editing one item."""
+    body = {k: v for k, v in locals().items() if v is not None}
+    if "stats" in body:
+        body["stats"] = [s.model_dump() for s in body["stats"]]
+    if not body:
+        raise ToolError("Pass at least one field to change.")
+    return await request("PUT", "/api/admin/profile", json=body)
