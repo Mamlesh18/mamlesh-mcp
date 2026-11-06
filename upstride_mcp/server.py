@@ -134,3 +134,88 @@ async def update_site_settings(
     if not body:
         raise ToolError("Pass at least one setting to change.")
     return await request("PUT", "/api/admin/settings", json=body)
+
+
+# ═════════════════════════════════════════════════════════════════ blogs ══
+
+class Block(BaseModel):
+    """One block of a blog body."""
+    type: Literal["heading", "paragraph", "list", "image", "quote", "code"]
+    text: Optional[str] = Field(default=None, description="heading / paragraph / quote / code text")
+    items: Optional[list[str]] = Field(default=None, description="Bullet items, for type=list")
+    url: Optional[str] = Field(default=None, description="Image URL, for type=image")
+    caption: Optional[str] = Field(default=None, description="Image caption, for type=image")
+
+
+async def _find_blog(slug: str) -> dict:
+    blogs = await request("GET", "/api/admin/blogs")
+    for b in blogs:
+        if b["slug"] == slug:
+            return b
+    raise ToolError(f"No blog with slug '{slug}'. Use list_blogs to see slugs.")
+
+
+@mcp.tool(annotations=READ)
+async def list_blogs(
+    include_drafts: bool = True,
+) -> list[dict]:
+    """All blogs, newest first: slug, title, excerpt, published flag, created date.
+    Bodies are left out; use get_blog for the full content."""
+    blogs = await request("GET", "/api/admin/blogs")
+    return [
+        {k: v for k, v in b.items() if k != "blocks"}
+        for b in blogs
+        if include_drafts or b.get("published")
+    ]
+
+
+@mcp.tool(annotations=READ)
+async def get_blog(slug: str) -> dict:
+    """One blog with its full body (blocks), drafts included."""
+    return await _find_blog(slug)
+
+
+@mcp.tool(annotations=WRITE)
+async def create_blog(
+    title: Annotated[str, Field(min_length=1, max_length=200)],
+    blocks: Annotated[list[Block], Field(description="Body as ordered blocks")],
+    excerpt: Annotated[str, Field(max_length=400, description="Short summary shown on the list page")] = "",
+    cover_image: Annotated[Optional[str], Field(description="Cover image URL")] = None,
+    published: Annotated[bool, Field(description="False saves it as a draft")] = False,
+) -> dict:
+    """Write a new blog post. Saved as a draft unless published=True. The slug is
+    generated from the title."""
+    return await request("POST", "/api/admin/blogs", json={
+        "title": title,
+        "excerpt": excerpt,
+        "cover_image": cover_image,
+        "blocks": [b.model_dump() for b in blocks],
+        "published": published,
+    })
+
+
+@mcp.tool(annotations=WRITE)
+async def update_blog(
+    slug: Annotated[str, Field(description="Current slug of the post")],
+    title: Optional[str] = None,
+    blocks: Annotated[Optional[list[Block]], Field(description="Replaces the whole body when given")] = None,
+    excerpt: Optional[str] = None,
+    cover_image: Optional[str] = None,
+    published: Annotated[Optional[bool], Field(description="True publishes, False unpublishes")] = None,
+) -> dict:
+    """Edit a blog post. Only the fields you pass change. Changing the title changes the slug."""
+    current = await _find_blog(slug)
+    body = {
+        "title": title if title is not None else current["title"],
+        "excerpt": excerpt if excerpt is not None else current.get("excerpt", ""),
+        "cover_image": cover_image if cover_image is not None else current.get("cover_image"),
+        "blocks": [b.model_dump() for b in blocks] if blocks is not None else current.get("blocks", []),
+        "published": published if published is not None else current.get("published", True),
+    }
+    return await request("PUT", f"/api/admin/blogs/{slug}", json=body)
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+async def delete_blog(slug: str) -> dict:
+    """Permanently delete a blog post. Confirm with the user first."""
+    return await request("DELETE", f"/api/admin/blogs/{slug}")
