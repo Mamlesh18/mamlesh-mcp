@@ -270,3 +270,47 @@ async def update_paper(
 async def delete_paper(paper_id: str) -> dict:
     """Permanently remove a papershelf entry. Confirm with the user first."""
     return await request("DELETE", f"/api/admin/papers/{paper_id}")
+
+
+# ══════════════════════════════════════════════ guest lectures (talks) ══
+
+@mcp.tool(annotations=READ)
+async def list_talks() -> list[dict]:
+    """Guest lectures / talks, in the order the site shows them."""
+    return await request("GET", "/api/admin/talks")
+
+
+@mcp.tool(annotations=WRITE)
+async def add_talk(
+    date: Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$", description="YYYY-MM-DD")],
+    title: Annotated[str, Field(min_length=1, max_length=300)],
+    venue: Annotated[str, Field(max_length=200, description="College or event name")] = "",
+    link: Annotated[str, Field(description="Venue or event website")] = "",
+) -> dict:
+    """Add a guest lecture / talk."""
+    return await request("POST", "/api/admin/talks", json={"date": date, "title": title, "venue": venue, "link": link})
+
+
+@mcp.tool(annotations=WRITE)
+async def update_talk(
+    talk_id: str,
+    date: Annotated[Optional[str], Field(pattern=r"^\d{4}-\d{2}-\d{2}$")] = None,
+    title: Optional[str] = None,
+    venue: Optional[str] = None,
+    link: Optional[str] = None,
+) -> dict:
+    """Edit a talk. Only the fields you pass change."""
+    cur = await _find("/api/admin/talks", talk_id, "talk")
+    body = {
+        "date": date if date is not None else cur["date"],
+        "title": title if title is not None else cur["title"],
+        "venue": venue if venue is not None else cur.get("venue", ""),
+        "link": link if link is not None else cur.get("link", ""),
+    }
+    return await request("PUT", f"/api/admin/talks/{talk_id}", json=body)
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+async def delete_talk(talk_id: str) -> dict:
+    """Permanently remove a talk. Confirm with the user first."""
+    return await request("DELETE", f"/api/admin/talks/{talk_id}")
