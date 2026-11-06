@@ -87,3 +87,22 @@ async def resend_enrollment_email(
     """Re-send the AI Masterclass enrollment confirmation email to a paid student and
     report the SMTP result."""
     return await request("POST", f"/api/admin/students/{student_id}/resend-confirmation")
+
+
+# ═════════════════════════════════════════════════════════════════ leads ══
+
+@mcp.tool(annotations=READ)
+async def list_leads(
+    search: Annotated[Optional[str], Field(description="Filter on name, email or phone")] = None,
+    limit: Annotated[int, Field(ge=1, le=500)] = 50,
+) -> dict:
+    """Leads from public signups and the apply form, newest first."""
+    data = await request("GET", "/api/admin/leads")
+    leads = data.get("leads", [])
+    if search:
+        q = search.lower()
+        leads = [
+            l for l in leads
+            if any(q in str(l.get(k, "")).lower() for k in ("name", "email", "phone"))
+        ]
+    return {"total_matching": len(leads), "leads": leads[:limit]}
