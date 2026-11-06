@@ -106,3 +106,31 @@ async def list_leads(
             if any(q in str(l.get(k, "")).lower() for k in ("name", "email", "phone"))
         ]
     return {"total_matching": len(leads), "leads": leads[:limit]}
+
+
+# ══════════════════════════════════════════════════════════ site settings ══
+
+@mcp.tool(annotations=READ)
+async def get_site_settings() -> dict:
+    """Course page settings: live/original price, payment URL, notes, calendar and
+    community links, talks order."""
+    return await request("GET", "/api/admin/settings")
+
+
+@mcp.tool(annotations=WRITE)
+async def update_site_settings(
+    live_price_inr: Optional[int] = None,
+    original_price_inr: Optional[int] = None,
+    live_payment_url: Optional[str] = None,
+    enrollment_note: Optional[str] = None,
+    weekend_full_message: Optional[str] = None,
+    early_bird_text: Optional[str] = None,
+    calendar_link: Optional[str] = None,
+    community_link: Optional[str] = None,
+    talks_order: Optional[Literal["newest", "oldest"]] = None,
+) -> dict:
+    """Change course page settings. Pass only the fields to change; changes go live immediately."""
+    body = {k: v for k, v in locals().items() if v is not None}
+    if not body:
+        raise ToolError("Pass at least one setting to change.")
+    return await request("PUT", "/api/admin/settings", json=body)
