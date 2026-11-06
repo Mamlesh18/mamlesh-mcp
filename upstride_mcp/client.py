@@ -16,7 +16,7 @@ TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 # Fields that should never be handed to the model, even though the backend
 # returns some of them on user documents.
-SENSITIVE_KEYS = {"password_hash", "onboarding_token", "active_session_id"}
+SENSITIVE_KEYS = {"password_hash", "onboarding_token", "active_session_id", "resume_enhancer_password"}
 
 _token: str | None = None
 
