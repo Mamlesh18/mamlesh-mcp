@@ -219,3 +219,54 @@ async def update_blog(
 async def delete_blog(slug: str) -> dict:
     """Permanently delete a blog post. Confirm with the user first."""
     return await request("DELETE", f"/api/admin/blogs/{slug}")
+
+
+# ════════════════════════════════════════════════════════════ papershelf ══
+
+async def _find(path: str, item_id: str, label: str) -> dict:
+    for item in await request("GET", path):
+        if item["id"] == item_id:
+            return item
+    raise ToolError(f"No {label} with id '{item_id}'.")
+
+
+@mcp.tool(annotations=READ)
+async def list_papers() -> list[dict]:
+    """Papershelf: research papers and books, newest first."""
+    return await request("GET", "/api/admin/papers")
+
+
+@mcp.tool(annotations=WRITE)
+async def add_paper(
+    title: Annotated[str, Field(min_length=1, max_length=300)],
+    url: Annotated[str, Field(min_length=1, description="Link to the paper or book")],
+    kind: Literal["paper", "book"] = "paper",
+    date: Annotated[str, Field(max_length=40, description="Free text, e.g. 2025 or Mar 2025")] = "",
+) -> dict:
+    """Add a paper or book to the papershelf."""
+    return await request("POST", "/api/admin/papers", json={"title": title, "url": url, "kind": kind, "date": date})
+
+
+@mcp.tool(annotations=WRITE)
+async def update_paper(
+    paper_id: str,
+    title: Optional[str] = None,
+    url: Optional[str] = None,
+    kind: Optional[Literal["paper", "book"]] = None,
+    date: Optional[str] = None,
+) -> dict:
+    """Edit a papershelf entry. Only the fields you pass change."""
+    cur = await _find("/api/admin/papers", paper_id, "paper")
+    body = {
+        "title": title if title is not None else cur["title"],
+        "url": url if url is not None else cur["url"],
+        "kind": kind if kind is not None else cur["kind"],
+        "date": date if date is not None else cur.get("date", ""),
+    }
+    return await request("PUT", f"/api/admin/papers/{paper_id}", json=body)
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+async def delete_paper(paper_id: str) -> dict:
+    """Permanently remove a papershelf entry. Confirm with the user first."""
+    return await request("DELETE", f"/api/admin/papers/{paper_id}")
