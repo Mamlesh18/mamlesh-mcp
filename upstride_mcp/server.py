@@ -349,3 +349,17 @@ async def update_profile(
     if not body:
         raise ToolError("Pass at least one field to change.")
     return await request("PUT", "/api/admin/profile", json=body)
+
+
+# ══════════════════════════════════════════════════════ whatsapp batches ══
+
+@mcp.tool(annotations=READ)
+async def list_whatsapp_batches() -> dict:
+    """WhatsApp batches with status (open/upcoming/full/ended/closed), window, capacity
+    and student count, plus paid students still waiting for a batch."""
+    data = await request("GET", "/api/admin/whatsapp-batches")
+    # QR images are large data URLs; keep the response readable.
+    for b in data.get("batches", []):
+        if b.get("qr_image"):
+            b["qr_image"] = "(set)"
+    return data
